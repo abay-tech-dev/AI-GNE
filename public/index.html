@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔥 FireChat — Twitch Chat Heat Widget</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0e0e10;
+      --surface:   #18181b;
+      --border:    #2a2a2f;
+      --accent:    #ff5500;
+      --accent2:   #ff9900;
+      --text:      #efeff1;
+      --muted:     #848494;
+      --radius:    12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── Header ── */
+    header {
+      width: 100%;
+      padding: 20px 32px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    header h1 {
+      font-size: 22px;
+      font-weight: 800;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* ── Main ── */
+    main {
+      width: 100%;
+      max-width: 860px;
+      padding: 48px 24px 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 48px;
+    }
+
+    .hero {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .hero h2 {
+      font-size: 38px;
+      font-weight: 900;
+      line-height: 1.15;
+    }
+
+    .hero h2 span {
+      background: linear-gradient(90deg, #ff2200, #ff9900, #ffee00);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero p {
+      color: var(--muted);
+      font-size: 16px;
+      max-width: 540px;
+      line-height: 1.6;
+    }
+
+    /* ── Generator card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+    }
+
+    .card h3 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .input-row input {
+      flex: 1;
+      min-width: 220px;
+      padding: 12px 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-row input::placeholder { color: var(--muted); }
+    .input-row input:focus { border-color: var(--accent); }
+
+    .btn {
+      padding: 12px 24px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      white-space: nowrap;
+    }
+
+    .btn:hover  { opacity: 0.9; }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── URL result ── */
+    #result-section {
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 24px;
+    }
+
+    #result-section.visible { display: flex; }
+
+    .url-box {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+
+    .url-box span {
+      flex: 1;
+      font-size: 13px;
+      color: #9b9baa;
+      word-break: break-all;
+      font-family: monospace;
+    }
+
+    .copy-btn {
+      padding: 6px 14px;
+      background: var(--border);
+      border: none;
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+
+    .copy-btn:hover   { background: #3a3a45; }
+    .copy-btn.copied  { background: #1a5c2a; color: #5dfc8e; }
+
+    /* ── Preview ── */
+    .preview-wrap {
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      background: repeating-linear-gradient(
+        45deg,
+        var(--bg),
+        var(--bg) 10px,
+        #111115 10px,
+        #111115 20px
+      );
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 300px;
+      position: relative;
+    }
+
+    .preview-label {
+      position: absolute;
+      top: 10px;
+      left: 14px;
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--bg);
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    #preview-frame {
+      width: 90px;
+      height: 260px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+    }
+
+    /* ── OBS instructions ── */
+    .steps {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      counter-reset: step;
+    }
+
+    .steps li {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      counter-increment: step;
+    }
+
+    .steps li::before {
+      content: counter(step);
+      min-width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      font-size: 13px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .steps li p   { font-size: 15px; line-height: 1.5; }
+    .steps li kbd {
+      display: inline-block;
+      background: var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 12px;
+      font-family: monospace;
+    }
+
+    /* ── How it works ── */
+    .pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .pill {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ── Heuristic breakdown ── */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .metric-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .metric-card .icon { font-size: 22px; }
+    .metric-card .name { font-size: 13px; font-weight: 700; }
+    .metric-card .desc { font-size: 12px; color: var(--muted); line-height: 1.4; }
+    .metric-card .weight {
+      font-size: 11px;
+      color: var(--accent2);
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    /* ── Footer ── */
+    footer {
+      width: 100%;
+      border-top: 1px solid var(--border);
+      padding: 20px 32px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <span style="font-size:26px">🔥</span>
+    <h1>FireChat</h1>
+  </header>
+
+  <main>
+
+    <!-- Hero -->
+    <section class="hero">
+      <h2>Know when your chat is<br><span>on fire</span></h2>
+      <p>
+        A real-time Twitch chat heatmeter widget for OBS &amp; Streamlabs.
+        No signup, no backend, <strong>100% free</strong>.
+        Paste the URL and go live.
+      </p>
+    </section>
+
+    <!-- Generator -->
+    <section class="card">
+      <h3>⚡ Generate your widget URL</h3>
+      <div class="input-row">
+        <input
+          type="text"
+          id="channel-input"
+          placeholder="Your Twitch channel name…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button class="btn" id="generate-btn">Generate</button>
+      </div>
+
+      <div id="result-section">
+        <div>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:8px">
+            📋 Copy this URL into OBS as a <strong>Browser Source</strong>
+          </p>
+          <div class="url-box">
+            <span id="widget-url"></span>
+            <button class="copy-btn" id="copy-btn">Copy</button>
+          </div>
+        </div>
+
+        <!-- Live preview -->
+        <p style="font-size:13px;color:var(--muted)">
+          👀 Live preview — connect the widget to your channel to see it in action
+        </p>
+        <div class="preview-wrap">
+          <span class="preview-label">OBS Browser Source preview</span>
+          <iframe id="preview-frame" title="Widget preview" scrolling="no"></iframe>
+        </div>
+      </div>
+    </section>
+
+    <!-- OBS Setup -->
+    <section class="card">
+      <h3>🎬 How to add to OBS / Streamlabs</h3>
+      <ol class="steps">
+        <li><p>Click <kbd>+</kbd> in your Sources panel and choose <strong>Browser Source</strong>.</p></li>
+        <li><p>Paste your generated widget URL into the <strong>URL</strong> field.</p></li>
+        <li><p>Set width to <kbd>90</kbd> and height to <kbd>280</kbd>. Tick <strong>Shutdown source when not visible</strong>.</p></li>
+        <li><p>Make sure <strong>Custom CSS</strong> is blank, then click <strong>OK</strong> and position the widget wherever you like on your scene.</p></li>
+        <li><p>Start streaming — the bar rises automatically as your chat heats up! 🔥</p></li>
+      </ol>
+    </section>
+
+    <!-- How it works -->
+    <section class="card">
+      <h3>🧠 How the score is calculated</h3>
+      <p style="font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:16px">
+        No AI API calls, no backend — all analysis runs <strong>directly in your browser</strong> using
+        a weighted heuristics engine. Zero latency, zero cost.
+      </p>
+      <div class="metrics">
+        <div class="metric-card">
+          <span class="icon">💬</span>
+          <span class="name">Message Volume</span>
+          <span class="desc">Messages per 20-second rolling window. The more the chat talks, the higher the base score.</span>
+          <span class="weight">Weight: 55%</span>
+        </div>
+        <div class="metric-card">
+          <span class="icon">🔤</span>
+          <span class="name">CAPS Ratio</span>
+          <span class="desc">Proportion of ALL-CAPS words. High caps = hype energy.</span>
+          <span class="weight">Hype signal: 30%</span>
+        </div>
+        <div class="metric-card">
+          <span class="icon">😂</span>
+          <span class="name">Hype Emotes</span>
+          <span class="desc">Known Twitch emotes (Pog, OMEGALUL, KEKW, Clap…) detected per message.</span>
+          <span class="weight">Hype signal: 30%</span>
+        </div>
+        <div class="metric-card">
+          <span class="icon">🔑</span>
+          <span class="name">Hype Keywords</span>
+          <span class="desc">Trigger words like "clip it", "insane", "gg", "lets go", "sheesh"…</span>
+          <span class="weight">Hype signal: 25%</span>
+        </div>
+        <div class="metric-card">
+          <span class="icon">❗</span>
+          <span class="name">Exclamation Marks</span>
+          <span class="desc">Raw count of ! per message. "LETS GO!!!" hits harder than "nice".</span>
+          <span class="weight">Hype signal: 15%</span>
+        </div>
+      </div>
+      <div style="margin-top:18px">
+        <p style="font-size:13px;color:var(--muted)">
+          ✨ When chat goes quiet the bar smoothly decays, keeping the visualization honest.
+        </p>
+      </div>
+    </section>
+
+    <!-- Cost -->
+    <section class="card">
+      <h3>💸 Why it's free</h3>
+      <p style="font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:16px">
+        FireChat connects <strong>directly to Twitch's public IRC WebSocket</strong> from your browser.
+        No server, no API key, no LLM. Everything runs client-side.
+      </p>
+      <div class="pills">
+        <span class="pill">🌐 100% client-side</span>
+        <span class="pill">🔒 No data collection</span>
+        <span class="pill">⚡ &lt; 2s latency</span>
+        <span class="pill">🤖 No AI API costs</span>
+        <span class="pill">♾️ Unlimited channels</span>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    FireChat &mdash; Twitch Chat Heat Widget &bull; No affiliation with Twitch Interactive Inc.
+  </footer>
+
+  <script>
+    const input      = document.getElementById('channel-input');
+    const generateBtn = document.getElementById('generate-btn');
+    const resultSec  = document.getElementById('result-section');
+    const urlSpan    = document.getElementById('widget-url');
+    const copyBtn    = document.getElementById('copy-btn');
+    const frame      = document.getElementById('preview-frame');
+
+    function buildWidgetUrl(channel) {
+      const base = location.origin + location.pathname.replace('index.html', '') + 'widget.html';
+      return base + '?channel=' + encodeURIComponent(channel.toLowerCase().replace(/^#/, ''));
+    }
+
+    generateBtn.addEventListener('click', () => {
+      const channel = input.value.trim();
+      if (!channel) { input.focus(); return; }
+
+      const url = buildWidgetUrl(channel);
+      urlSpan.textContent = url;
+      frame.src = url;
+      resultSec.classList.add('visible');
+      resultSec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') generateBtn.click();
+    });
+
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(urlSpan.textContent).then(() => {
+        copyBtn.textContent = '✓ Copied!';
+        copyBtn.classList.add('copied');
+        setTimeout(() => {
+          copyBtn.textContent = 'Copy';
+          copyBtn.classList.remove('copied');
+        }, 2000);
+      });
+    });
+  </script>
+
+</body>
+</html>

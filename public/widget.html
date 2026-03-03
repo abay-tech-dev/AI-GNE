@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat on Fire</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: transparent;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      width: 100vw;
+      height: 100vh;
+      font-family: 'Segoe UI', sans-serif;
+      overflow: hidden;
+    }
+
+    #widget {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      width: 90px;
+    }
+
+    /* Fire icon + score */
+    #header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    #fire-emoji {
+      font-size: 28px;
+      line-height: 1;
+      transition: transform 0.3s ease;
+      filter: drop-shadow(0 0 6px rgba(255, 100, 0, 0.8));
+    }
+
+    #score-label {
+      font-size: 13px;
+      font-weight: 800;
+      color: #fff;
+      text-shadow: 0 0 8px rgba(255,140,0,0.9), 0 1px 2px rgba(0,0,0,0.8);
+      letter-spacing: 0.5px;
+    }
+
+    /* Bar container */
+    #bar-container {
+      width: 28px;
+      height: 180px;
+      background: rgba(0, 0, 0, 0.45);
+      border-radius: 14px;
+      overflow: hidden;
+      position: relative;
+      border: 2px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 0 12px rgba(0,0,0,0.5);
+    }
+
+    #bar-fill {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 0%;
+      border-radius: 12px;
+      transition: height 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      background: linear-gradient(
+        to top,
+        #0066ff 0%,
+        #00ccff 20%,
+        #00ff88 35%,
+        #aaff00 50%,
+        #ffee00 65%,
+        #ff8800 80%,
+        #ff2200 100%
+      );
+    }
+
+    /* Flame shimmer animation at the top of the bar */
+    #bar-fill::after {
+      content: '';
+      position: absolute;
+      top: -4px;
+      left: -4px;
+      right: -4px;
+      height: 12px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(255,200,50,0.8) 0%, transparent 70%);
+      animation: shimmer 0.6s ease-in-out infinite alternate;
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+
+    #bar-fill.hot::after {
+      opacity: 1;
+    }
+
+    @keyframes shimmer {
+      from { transform: scaleX(0.8) scaleY(0.8); opacity: 0.6; }
+      to   { transform: scaleX(1.2) scaleY(1.4); opacity: 1.0; }
+    }
+
+    /* Flame particles */
+    .particle {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: rise 1.2s ease-out forwards;
+    }
+
+    @keyframes rise {
+      0%   { opacity: 1; transform: translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateY(-60px) scale(0.2); }
+    }
+
+    /* Glow halo on bar when hot */
+    #bar-container.hot {
+      box-shadow: 0 0 16px rgba(255, 80, 0, 0.6), 0 0 32px rgba(255, 50, 0, 0.3);
+    }
+
+    /* Channel label */
+    #channel-label {
+      font-size: 10px;
+      color: rgba(255,255,255,0.55);
+      text-align: center;
+      max-width: 80px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+    }
+
+    /* Error / info states */
+    #status {
+      font-size: 9px;
+      color: rgba(255,255,255,0.4);
+      text-align: center;
+      max-width: 80px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    }
+
+    /* Hide when not needed */
+    .hidden { display: none !important; }
+
+    /* Pulse when score > 80 */
+    @keyframes pulse-glow {
+      0%   { filter: drop-shadow(0 0 6px rgba(255, 100, 0, 0.8)); }
+      50%  { filter: drop-shadow(0 0 18px rgba(255, 50, 0, 1)); }
+      100% { filter: drop-shadow(0 0 6px rgba(255, 100, 0, 0.8)); }
+    }
+
+    #fire-emoji.blazing {
+      animation: pulse-glow 0.6s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body>
+  <div id="widget">
+    <div id="header">
+      <span id="fire-emoji">🔥</span>
+      <span id="score-label">0%</span>
+    </div>
+    <div id="bar-container">
+      <div id="bar-fill"></div>
+    </div>
+    <span id="channel-label"></span>
+    <span id="status">connecting…</span>
+  </div>
+
+  <script>
+    // ─── Config from URL params ───────────────────────────────────────────────
+    const params  = new URLSearchParams(location.search);
+    const CHANNEL = (params.get('channel') || '').toLowerCase().replace(/^#/, '');
+
+    if (!CHANNEL) {
+      document.getElementById('status').textContent = 'No ?channel= set';
+    }
+
+    document.getElementById('channel-label').textContent = CHANNEL ? '#' + CHANNEL : '';
+
+    // ─── Heuristics dictionaries ──────────────────────────────────────────────
+    const HYPE_EMOTES = new Set([
+      'PogChamp','Pog','POGGERS','PogU','PauseChamp','POGCRAZY',
+      'OMEGALUL','LUL','KEKW','LULW','CoolCat',
+      'monkaS','monkaW','monkaGIGA','Pepega',
+      'HYPERCLAP','Clap','NODDERS','GG',
+      'TriHard','EZ','EZY','peepoHappy','peepoClap',
+      'AYAYA','5Head','BibleThump','WeirdChamp','FeelsBadMan',
+      'sadge','Sadge','Kreygasm','HeyGuys','MrDestructoid',
+    ]);
+
+    const HYPE_KEYWORDS = [
+      "let'?s go",'letsgo','lets go','gg','ggs','omg','omfg',
+      'wtf','no way','insane','crazy','clip it','clip that',
+      'pog','poggers','goat','clutch','nice','fire',
+      'dude','bruh','bro','sheesh','bussin','based',
+      'rip','ez','ezpz','izi','izi pizi','outplayed',
+    ];
+
+    const KW_REGEX = new RegExp(
+      '\\b(' + HYPE_KEYWORDS.join('|') + ')\\b', 'i'
+    );
+
+    // ─── Score state ──────────────────────────────────────────────────────────
+    let currentScore  = 0;
+    let targetScore   = 0;
+
+    // Rolling windows
+    const MSG_WINDOW_MS  = 20000; // 20s window for volume
+    const SCORE_WINDOW_MS = 5000; // recalc every 5s
+    let messageTimestamps = [];   // array of { ts, signals }
+
+    // ─── Message analysis ─────────────────────────────────────────────────────
+    function analyzeMessage(text) {
+      const words   = text.trim().split(/\s+/);
+      const long    = words.filter(w => w.length > 3);
+      const caps    = long.filter(w => w === w.toUpperCase() && /[A-Z]/.test(w));
+      const capsRatio = long.length > 0 ? caps.length / long.length : 0;
+
+      const emoteCount   = words.filter(w => HYPE_EMOTES.has(w)).length;
+      const keywordMatch = KW_REGEX.test(text) ? 1 : 0;
+      const exclCount    = (text.match(/!/g) || []).length;
+
+      return { capsRatio, emoteCount, keywordMatch, exclCount };
+    }
+
+    // ─── Score calculation ────────────────────────────────────────────────────
+    function calcScore() {
+      const now   = Date.now();
+      const cutoff = now - MSG_WINDOW_MS;
+
+      // Purge old messages
+      messageTimestamps = messageTimestamps.filter(m => m.ts > cutoff);
+
+      const count = messageTimestamps.length;
+      if (count === 0) return 0;
+
+      // Volume score: 0 msg/20s=0, 5=20, 15=50, 30=75, 60+=100
+      const rate = count; // messages in last 20s
+      const volumeScore = Math.min(100, (rate / 40) * 100);
+
+      // Aggregate signals
+      let totalCaps = 0, totalEmotes = 0, totalKw = 0, totalExcl = 0;
+      for (const m of messageTimestamps) {
+        totalCaps   += m.sig.capsRatio;
+        totalEmotes += m.sig.emoteCount;
+        totalKw     += m.sig.keywordMatch;
+        totalExcl   += m.sig.exclCount;
+      }
+
+      const capsScore   = Math.min(100, (totalCaps   / count) * 100);
+      const emoteScore  = Math.min(100, (totalEmotes / count) * 80);
+      const kwScore     = Math.min(100, (totalKw     / count) * 120);
+      const exclScore   = Math.min(100, (totalExcl   / count) * 60);
+
+      const hypeScore = Math.min(100, (capsScore * 0.3 + emoteScore * 0.3 + kwScore * 0.25 + exclScore * 0.15));
+
+      // Final weighted score
+      const raw = (volumeScore * 0.55) + (hypeScore * 0.45);
+      return Math.min(100, Math.round(raw));
+    }
+
+    // ─── DOM updates ──────────────────────────────────────────────────────────
+    const barFill   = document.getElementById('bar-fill');
+    const barCont   = document.getElementById('bar-container');
+    const scoreEl   = document.getElementById('score-label');
+    const fireEmoji = document.getElementById('fire-emoji');
+
+    function updateUI(score) {
+      barFill.style.height = score + '%';
+      scoreEl.textContent  = Math.round(score) + '%';
+
+      barFill.classList.toggle('hot',   score > 50);
+      barCont.classList.toggle('hot',   score > 65);
+      fireEmoji.classList.toggle('blazing', score > 80);
+    }
+
+    // Smooth score animation (lerp toward target)
+    function tick() {
+      // Decay: score falls toward target naturally
+      // target itself decays when chat is quiet
+      const now = Date.now();
+      const recentCount = messageTimestamps.filter(m => m.ts > now - 5000).length;
+
+      if (recentCount === 0) {
+        targetScore = Math.max(0, targetScore - 1.5); // 1.5pt/tick decay
+      }
+
+      // Lerp current → target
+      currentScore += (targetScore - currentScore) * 0.12;
+      if (currentScore < 0.5) currentScore = 0;
+
+      updateUI(currentScore);
+      requestAnimationFrame(tick);
+    }
+
+    // Recalculate target score every 2s
+    setInterval(() => {
+      targetScore = calcScore();
+    }, 2000);
+
+    requestAnimationFrame(tick);
+
+    // ─── Particle emitter ─────────────────────────────────────────────────────
+    function spawnParticle() {
+      if (currentScore < 40) return;
+      const container = document.getElementById('bar-container');
+      const pct = currentScore / 100;
+      const p   = document.createElement('div');
+      p.className = 'particle';
+      const colors = ['#ff4400','#ff8800','#ffcc00','#ff2200'];
+      p.style.background = colors[Math.floor(Math.random() * colors.length)];
+      p.style.left   = (Math.random() * 20 + 4) + 'px';
+      p.style.bottom = (pct * 180 - 4) + 'px';
+      p.style.animationDuration = (0.8 + Math.random() * 0.8) + 's';
+      container.appendChild(p);
+      setTimeout(() => p.remove(), 1600);
+    }
+
+    setInterval(spawnParticle, 300);
+
+    // ─── Twitch IRC WebSocket ─────────────────────────────────────────────────
+    const statusEl = document.getElementById('status');
+    let ws, reconnectDelay = 2000;
+
+    function connect() {
+      if (!CHANNEL) return;
+
+      ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
+
+      ws.onopen = () => {
+        // Anonymous read-only auth
+        ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
+        ws.send('PASS SCHMOOPIIE');
+        ws.send('NICK justinfan' + Math.floor(Math.random() * 80000 + 10000));
+        ws.send('JOIN #' + CHANNEL);
+        statusEl.textContent = 'connected';
+        setTimeout(() => statusEl.classList.add('hidden'), 3000);
+        reconnectDelay = 2000;
+      };
+
+      ws.onmessage = (event) => {
+        const raw = event.data;
+
+        // Keep-alive
+        if (raw.startsWith('PING')) {
+          ws.send('PONG :tmi.twitch.tv');
+          return;
+        }
+
+        // Parse PRIVMSG
+        if (!raw.includes('PRIVMSG')) return;
+        const match = raw.match(/PRIVMSG #\S+ :(.*)/);
+        if (!match) return;
+
+        const text = match[1];
+        const sig  = analyzeMessage(text);
+        messageTimestamps.push({ ts: Date.now(), sig });
+      };
+
+      ws.onerror = () => {
+        statusEl.textContent = 'error — retrying…';
+        statusEl.classList.remove('hidden');
+      };
+
+      ws.onclose = () => {
+        statusEl.textContent = 'reconnecting…';
+        statusEl.classList.remove('hidden');
+        setTimeout(connect, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+      };
+    }
+
+    connect();
+  </script>
+</body>
+</html>
