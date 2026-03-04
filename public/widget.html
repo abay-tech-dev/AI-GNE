@@ -138,6 +138,17 @@
       text-shadow: 0 1px 3px rgba(0,0,0,0.9);
     }
 
+    /* AI badge — shown when LLM mode is active */
+    #llm-badge {
+      font-size: 9px;
+      color: #a78bfa;
+      text-align: center;
+      display: none;
+      text-shadow: 0 0 6px rgba(167,139,250,0.8);
+    }
+
+    #llm-badge.active { display: block; }
+
     /* Error / info states */
     #status {
       font-size: 9px;
@@ -172,19 +183,25 @@
       <div id="bar-fill"></div>
     </div>
     <span id="channel-label"></span>
+    <span id="llm-badge">✨ AI</span>
     <span id="status">connecting…</span>
   </div>
 
   <script>
     // ─── Config from URL params ───────────────────────────────────────────────
-    const params  = new URLSearchParams(location.search);
-    const CHANNEL = (params.get('channel') || '').toLowerCase().replace(/^#/, '');
+    const params   = new URLSearchParams(location.search);
+    const CHANNEL  = (params.get('channel') || '').toLowerCase().replace(/^#/, '');
+    const LLM_KEY  = params.get('groqKey') || '';
 
     if (!CHANNEL) {
       document.getElementById('status').textContent = 'No ?channel= set';
     }
 
     document.getElementById('channel-label').textContent = CHANNEL ? '#' + CHANNEL : '';
+
+    if (LLM_KEY) {
+      document.getElementById('llm-badge').classList.add('active');
+    }
 
     // ─── Heuristics dictionaries ──────────────────────────────────────────────
     const HYPE_EMOTES = new Set([
@@ -212,13 +229,15 @@
     // ─── Score state ──────────────────────────────────────────────────────────
     let currentScore  = 0;
     let targetScore   = 0;
+    let llmHypeScore  = null;  // null = LLM not yet scored
+    let llmPending    = false;
 
     // Rolling windows
-    const MSG_WINDOW_MS  = 20000; // 20s window for volume
-    const SCORE_WINDOW_MS = 5000; // recalc every 5s
-    let messageTimestamps = [];   // array of { ts, signals }
+    const MSG_WINDOW_MS     = 20000; // 20s window for volume
+    const LLM_BATCH_MS      = 5000;  // LLM called every 5s
+    let messageTimestamps   = [];    // array of { ts, sig, text }
 
-    // ─── Message analysis ─────────────────────────────────────────────────────
+    // ─── Message analysis (heuristics fallback) ───────────────────────────────
     function analyzeMessage(text) {
       const words   = text.trim().split(/\s+/);
       const long    = words.filter(w => w.length > 3);
@@ -232,9 +251,57 @@
       return { capsRatio, emoteCount, keywordMatch, exclCount };
     }
 
+    // ─── Groq LLM batch analysis ──────────────────────────────────────────────
+    async function callGroq(recentMsgs) {
+      if (!LLM_KEY || llmPending || recentMsgs.length === 0) return;
+      llmPending = true;
+      try {
+        const texts = recentMsgs.slice(-20).map(m => m.text).join('\n');
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + LLM_KEY,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'llama-3.1-8b-instant',
+            messages: [{
+              role: 'user',
+              content:
+                'You are a Twitch chat hype analyzer. ' +
+                'Rate the excitement level of these chat messages from 0 to 100. ' +
+                '0 = spam, bots, incoherent, or calm. 100 = genuine hype and excitement. ' +
+                'Reply ONLY with valid JSON: {"score":<integer>}\n\nMessages:\n' + texts
+            }],
+            max_tokens: 20,
+            temperature: 0.1
+          })
+        });
+        const data = await res.json();
+        const content = data.choices[0].message.content.trim();
+        const parsed = JSON.parse(content);
+        if (typeof parsed.score === 'number') {
+          llmHypeScore = Math.min(100, Math.max(0, parsed.score));
+        }
+      } catch (e) {
+        // silent fail — keep previous llmHypeScore
+      } finally {
+        llmPending = false;
+      }
+    }
+
+    // Batch LLM call every 5s (only when key is set)
+    if (LLM_KEY) {
+      setInterval(() => {
+        const now    = Date.now();
+        const recent = messageTimestamps.filter(m => m.ts > now - MSG_WINDOW_MS);
+        callGroq(recent);
+      }, LLM_BATCH_MS);
+    }
+
     // ─── Score calculation ────────────────────────────────────────────────────
     function calcScore() {
-      const now   = Date.now();
+      const now    = Date.now();
       const cutoff = now - MSG_WINDOW_MS;
 
       // Purge old messages
@@ -243,28 +310,32 @@
       const count = messageTimestamps.length;
       if (count === 0) return 0;
 
-      // Volume score: 0 msg/20s=0, 5=20, 15=50, 30=75, 60+=100
-      const rate = count; // messages in last 20s
-      const volumeScore = Math.min(100, (rate / 40) * 100);
+      // Volume score: 40 msg/20s = 100%
+      const volumeScore = Math.min(100, (count / 40) * 100);
 
-      // Aggregate signals
-      let totalCaps = 0, totalEmotes = 0, totalKw = 0, totalExcl = 0;
-      for (const m of messageTimestamps) {
-        totalCaps   += m.sig.capsRatio;
-        totalEmotes += m.sig.emoteCount;
-        totalKw     += m.sig.keywordMatch;
-        totalExcl   += m.sig.exclCount;
+      // Hype component: LLM score if available, otherwise heuristics
+      let hypeComponent;
+      if (llmHypeScore !== null) {
+        hypeComponent = llmHypeScore;
+      } else {
+        let totalCaps = 0, totalEmotes = 0, totalKw = 0, totalExcl = 0;
+        for (const m of messageTimestamps) {
+          totalCaps   += m.sig.capsRatio;
+          totalEmotes += m.sig.emoteCount;
+          totalKw     += m.sig.keywordMatch;
+          totalExcl   += m.sig.exclCount;
+        }
+        const capsScore  = Math.min(100, (totalCaps   / count) * 100);
+        const emoteScore = Math.min(100, (totalEmotes / count) * 80);
+        const kwScore    = Math.min(100, (totalKw     / count) * 120);
+        const exclScore  = Math.min(100, (totalExcl   / count) * 60);
+        hypeComponent = Math.min(100,
+          capsScore * 0.3 + emoteScore * 0.3 + kwScore * 0.25 + exclScore * 0.15
+        );
       }
 
-      const capsScore   = Math.min(100, (totalCaps   / count) * 100);
-      const emoteScore  = Math.min(100, (totalEmotes / count) * 80);
-      const kwScore     = Math.min(100, (totalKw     / count) * 120);
-      const exclScore   = Math.min(100, (totalExcl   / count) * 60);
-
-      const hypeScore = Math.min(100, (capsScore * 0.3 + emoteScore * 0.3 + kwScore * 0.25 + exclScore * 0.15));
-
       // Final weighted score
-      const raw = (volumeScore * 0.55) + (hypeScore * 0.45);
+      const raw = (volumeScore * 0.55) + (hypeComponent * 0.45);
       return Math.min(100, Math.round(raw));
     }
 
@@ -285,13 +356,16 @@
 
     // Smooth score animation (lerp toward target)
     function tick() {
-      // Decay: score falls toward target naturally
-      // target itself decays when chat is quiet
       const now = Date.now();
       const recentCount = messageTimestamps.filter(m => m.ts > now - 5000).length;
 
       if (recentCount === 0) {
-        targetScore = Math.max(0, targetScore - 1.5); // 1.5pt/tick decay
+        targetScore = Math.max(0, targetScore - 1.5);
+        // Decay llmHypeScore too when chat is quiet
+        if (llmHypeScore !== null) {
+          llmHypeScore = Math.max(0, llmHypeScore - 1.5);
+          if (llmHypeScore === 0) llmHypeScore = null;
+        }
       }
 
       // Lerp current → target
@@ -337,7 +411,6 @@
       ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
 
       ws.onopen = () => {
-        // Anonymous read-only auth
         ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
         ws.send('PASS SCHMOOPIIE');
         ws.send('NICK justinfan' + Math.floor(Math.random() * 80000 + 10000));
@@ -350,20 +423,18 @@
       ws.onmessage = (event) => {
         const raw = event.data;
 
-        // Keep-alive
         if (raw.startsWith('PING')) {
           ws.send('PONG :tmi.twitch.tv');
           return;
         }
 
-        // Parse PRIVMSG
         if (!raw.includes('PRIVMSG')) return;
         const match = raw.match(/PRIVMSG #\S+ :(.*)/);
         if (!match) return;
 
         const text = match[1];
         const sig  = analyzeMessage(text);
-        messageTimestamps.push({ ts: Date.now(), sig });
+        messageTimestamps.push({ ts: Date.now(), sig, text });
       };
 
       ws.onerror = () => {
