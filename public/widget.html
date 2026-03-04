@@ -42,14 +42,6 @@
       filter: drop-shadow(0 0 6px rgba(255, 100, 0, 0.8));
     }
 
-    #score-label {
-      font-size: 13px;
-      font-weight: 800;
-      color: #fff;
-      text-shadow: 0 0 8px rgba(255,140,0,0.9), 0 1px 2px rgba(0,0,0,0.8);
-      letter-spacing: 0.5px;
-    }
-
     /* Bar container */
     #bar-container {
       width: 28px;
@@ -126,41 +118,6 @@
       box-shadow: 0 0 16px rgba(255, 80, 0, 0.6), 0 0 32px rgba(255, 50, 0, 0.3);
     }
 
-    /* Channel label */
-    #channel-label {
-      font-size: 10px;
-      color: rgba(255,255,255,0.55);
-      text-align: center;
-      max-width: 80px;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-      text-shadow: 0 1px 3px rgba(0,0,0,0.9);
-    }
-
-    /* AI badge — shown when LLM mode is active */
-    #llm-badge {
-      font-size: 9px;
-      color: #a78bfa;
-      text-align: center;
-      display: none;
-      text-shadow: 0 0 6px rgba(167,139,250,0.8);
-    }
-
-    #llm-badge.active { display: block; }
-
-    /* Error / info states */
-    #status {
-      font-size: 9px;
-      color: rgba(255,255,255,0.4);
-      text-align: center;
-      max-width: 80px;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-    }
-
-    /* Hide when not needed */
-    .hidden { display: none !important; }
-
     /* Pulse when score > 80 */
     @keyframes pulse-glow {
       0%   { filter: drop-shadow(0 0 6px rgba(255, 100, 0, 0.8)); }
@@ -177,14 +134,10 @@
   <div id="widget">
     <div id="header">
       <span id="fire-emoji">🔥</span>
-      <span id="score-label">0%</span>
     </div>
     <div id="bar-container">
       <div id="bar-fill"></div>
     </div>
-    <span id="channel-label"></span>
-    <span id="llm-badge">✨ AI</span>
-    <span id="status">connecting…</span>
   </div>
 
   <script>
@@ -193,17 +146,7 @@
     const CHANNEL  = (params.get('channel') || '').toLowerCase().replace(/^#/, '');
     const LLM_KEY  = params.get('groqKey') || '';
 
-    if (!CHANNEL) {
-      document.getElementById('status').textContent = 'No ?channel= set';
-    }
-
-    document.getElementById('channel-label').textContent = CHANNEL ? '#' + CHANNEL : '';
-
-    if (LLM_KEY) {
-      document.getElementById('llm-badge').classList.add('active');
-    }
-
-    // ─── Heuristics dictionaries ──────────────────────────────────────────────
+// ─── Heuristics dictionaries ──────────────────────────────────────────────
     const HYPE_EMOTES = new Set([
       'PogChamp','Pog','POGGERS','PogU','PauseChamp','POGCRAZY',
       'OMEGALUL','LUL','KEKW','LULW','CoolCat',
@@ -342,13 +285,10 @@
     // ─── DOM updates ──────────────────────────────────────────────────────────
     const barFill   = document.getElementById('bar-fill');
     const barCont   = document.getElementById('bar-container');
-    const scoreEl   = document.getElementById('score-label');
     const fireEmoji = document.getElementById('fire-emoji');
 
     function updateUI(score) {
       barFill.style.height = score + '%';
-      scoreEl.textContent  = Math.round(score) + '%';
-
       barFill.classList.toggle('hot',   score > 50);
       barCont.classList.toggle('hot',   score > 65);
       fireEmoji.classList.toggle('blazing', score > 80);
@@ -402,7 +342,6 @@
     setInterval(spawnParticle, 300);
 
     // ─── Twitch IRC WebSocket ─────────────────────────────────────────────────
-    const statusEl = document.getElementById('status');
     let ws, reconnectDelay = 2000;
 
     function connect() {
@@ -415,8 +354,6 @@
         ws.send('PASS SCHMOOPIIE');
         ws.send('NICK justinfan' + Math.floor(Math.random() * 80000 + 10000));
         ws.send('JOIN #' + CHANNEL);
-        statusEl.textContent = 'connected';
-        setTimeout(() => statusEl.classList.add('hidden'), 3000);
         reconnectDelay = 2000;
       };
 
@@ -437,14 +374,9 @@
         messageTimestamps.push({ ts: Date.now(), sig, text });
       };
 
-      ws.onerror = () => {
-        statusEl.textContent = 'error — retrying…';
-        statusEl.classList.remove('hidden');
-      };
+      ws.onerror = () => {};
 
       ws.onclose = () => {
-        statusEl.textContent = 'reconnecting…';
-        statusEl.classList.remove('hidden');
         setTimeout(connect, reconnectDelay);
         reconnectDelay = Math.min(reconnectDelay * 2, 30000);
       };
