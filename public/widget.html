@@ -113,6 +113,38 @@
       box-shadow: 0 0 16px rgba(255, 80, 0, 0.6), 0 0 32px rgba(255, 50, 0, 0.3);
     }
 
+    /* Bar + markers wrapper */
+    #bar-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    /* Percentage markers below the bar */
+    #markers {
+      position: relative;
+      width: 300px;
+      height: 14px;
+    }
+
+    #markers span {
+      position: absolute;
+      transform: translateX(-50%);
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.45);
+      user-select: none;
+      line-height: 1;
+    }
+
+    #markers span::before {
+      content: '';
+      display: block;
+      width: 1px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.3);
+      margin: 0 auto 2px;
+    }
+
     /* Pulse when score > 80 */
     @keyframes pulse-glow {
       0%   { filter: drop-shadow(0 0 6px rgba(255, 100, 0, 0.8)); }
@@ -127,11 +159,19 @@
 </head>
 <body>
   <div id="widget">
+    <div id="bar-wrapper">
+      <div id="bar-container">
+        <div id="bar-fill"></div>
+      </div>
+      <div id="markers">
+        <span style="left: 25%">25%</span>
+        <span style="left: 50%">50%</span>
+        <span style="left: 70%">70%</span>
+        <span style="left: 90%">90%</span>
+      </div>
+    </div>
     <div id="header">
       <span id="fire-emoji">🔥</span>
-    </div>
-    <div id="bar-container">
-      <div id="bar-fill"></div>
     </div>
   </div>
 
