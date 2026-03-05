@@ -234,7 +234,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 300px;
+      min-height: 140px;
       position: relative;
     }
 
@@ -251,8 +251,8 @@
     }
 
     #preview-frame {
-      width: 90px;
-      height: 260px;
+      width: 420px;
+      height: 90px;
       border: none;
       border-radius: 8px;
       background: transparent;
@@ -372,7 +372,7 @@
       <h2>Know when your chat is<br><span>on fire</span></h2>
       <p>
         A real-time Twitch chat heatmeter widget for OBS &amp; Streamlabs.
-        No signup, no backend, <strong>100% free</strong>.
+        No signup, no backend, no server.
         Paste the URL and go live.
       </p>
     </section>
@@ -401,8 +401,8 @@
         />
       </div>
       <p class="llm-hint">
-        Without a key, heuristics are used. With a free Groq key, an LLM classifies each batch of messages — filters spam and detects real hype.
-        Get a free key at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>.
+        Without a key, heuristics are used. With a Groq key, an LLM classifies each batch of messages — filters spam and detects real hype.
+        Get a key at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>.
       </p>
 
       <div id="result-section">
@@ -433,7 +433,7 @@
       <ol class="steps">
         <li><p>Click <kbd>+</kbd> in your Sources panel and choose <strong>Browser Source</strong>.</p></li>
         <li><p>Paste your generated widget URL into the <strong>URL</strong> field.</p></li>
-        <li><p>Set width to <kbd>90</kbd> and height to <kbd>280</kbd>. Tick <strong>Shutdown source when not visible</strong>.</p></li>
+        <li><p>Set width to <kbd>420</kbd> and height to <kbd>90</kbd>. Tick <strong>Shutdown source when not visible</strong>.</p></li>
         <li><p>Make sure <strong>Custom CSS</strong> is blank, then click <strong>OK</strong> and position the widget wherever you like on your scene.</p></li>
         <li><p>Start streaming — the bar rises automatically as your chat heats up! 🔥</p></li>
       </ol>
@@ -442,11 +442,6 @@
     <!-- How it works -->
     <section class="card">
       <h3>🧠 How the score is calculated</h3>
-      <p style="font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:16px">
-        By default, all analysis runs <strong>directly in your browser</strong> using a weighted heuristics engine — zero latency, zero cost.
-        Add a free <strong style="color:#a78bfa">Groq API key</strong> to enable AI mode: an LLM classifies each batch of messages every 5 seconds,
-        filtering spam and detecting genuine hype far more accurately.
-      </p>
       <div class="metrics">
         <div class="metric-card">
           <span class="icon">💬</span>
@@ -482,7 +477,7 @@
           <span class="icon">✨</span>
           <span class="name" style="color:#a78bfa">AI Mode (Groq)</span>
           <span class="desc">When a Groq key is set, an LLM scores each batch of messages every 5s — replaces heuristics for the hype component.</span>
-          <span class="weight" style="color:#a78bfa">Optional — free tier</span>
+          <span class="weight" style="color:#a78bfa">Optional</span>
         </div>
       </div>
       <div style="margin-top:18px">
@@ -492,18 +487,12 @@
       </div>
     </section>
 
-    <!-- Cost -->
+    <!-- Info pills -->
     <section class="card">
-      <h3>💸 Why it's free</h3>
-      <p style="font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:16px">
-        FireChat connects <strong>directly to Twitch's public IRC WebSocket</strong> from your browser.
-        No server, no API key, no LLM. Everything runs client-side.
-      </p>
       <div class="pills">
         <span class="pill">🌐 100% client-side</span>
         <span class="pill">🔒 No data collection</span>
         <span class="pill">⚡ &lt; 2s latency</span>
-        <span class="pill">✨ Groq free tier (AI mode)</span>
         <span class="pill">♾️ Unlimited channels</span>
       </div>
     </section>
